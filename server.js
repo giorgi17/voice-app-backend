@@ -6,6 +6,7 @@ let querystring = require('querystring')
 const passport = require("passport");
 
 const users = require("./routes/api/users");
+const usersRestricted = require("./routes/api/users-restricted");
 
 let app = express()
 
@@ -31,10 +32,13 @@ mongoose
 
 // Passport middleware
 app.use(passport.initialize());
+
 // Passport config
 require("./config/passport")(passport);
+
 // Routes
 app.use("/api/users", users);  
+app.use("/api/restricted-users", usersRestricted(passport)); 
 
 let redirect_uri = 
   process.env.REDIRECT_URI || 

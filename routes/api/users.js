@@ -3,11 +3,15 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const keys = require("../../config/keys");
+
 // Load input validation
 const validateRegisterInput = require("../../validation/register");
 const validateLoginInput = require("../../validation/login");
 // Load User model
 const User = require("../../models/User");
+
+const passport = require("passport");
+
 
 // @route POST api/users/register
 // @desc Register user
@@ -23,10 +27,17 @@ router.post("/register", (req, res) => {
       if (user) {
         return res.status(400).json({ email: "Email already exists" });
       } else {
+        let avatarImage = '';
+        if (req.body.avatarImage === '')
+          avatarImage = 'https://cdn.pixabay.com/photo/2016/08/08/09/17/avatar-1577909_960_720.png';
+        else 
+          avatarImage = req.body.avatarImage;
+
         const newUser = new User({
           name: req.body.name,
           email: req.body.email,
-          password: req.body.password
+          password: req.body.password,
+          avatarImage: avatarImage
         });
   // Hash password before saving in database
         bcrypt.genSalt(10, (err, salt) => {
@@ -56,7 +67,7 @@ router.post("/login", (req, res) => {
   const email = req.body.email;
     const password = req.body.password;
   // Find user by email
-    User.findOne({ email }).then(user => {
+    User.findOne({ email: email }).then(user => {
       // Check if user exists
       if (!user) {
         return res.status(404).json({ emailnotfound: "Email not found" });
