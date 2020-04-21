@@ -39,7 +39,6 @@ module.exports = (passport) => {
 		  upload.single('avatarPicture'),
 		  async (req, res) =>  { 
 		  	try {
-
 		  		// Check if image was sent
 		  		if(!req.hasOwnProperty('file')){
 				    return res.status(400).json('Image was not sent.');
@@ -60,7 +59,7 @@ module.exports = (passport) => {
 		  		// aws.config.setPromiseDependency();
 		  		aws.config.update({
 		  			accessKeyId: awsConfig.AWSAccessKeyId,
-		  			secretAccessKey: awsConfig.secretOrKey,
+		  			secretAccessKey: awsConfig.secretKey,
 		  			region: awsConfig.region
 		  		});
 
@@ -90,7 +89,8 @@ module.exports = (passport) => {
 			         Key: 'avatar-pictures/' + fileName, // file will be saved with new unique name
 			         Body: fs.createReadStream(req.file.path)
 			     };
-			     s3.upload(params, async function(s3Err, data) {
+			     
+		     	s3.upload(params, async function(s3Err, data) {
 			         if (s3Err) throw s3Err;			    
 
 				    // Delete the old picture from aws s3
@@ -104,12 +104,15 @@ module.exports = (passport) => {
 		              {$set: {avatarImage: data.Location}}
 	          		);
 
+			    	if (!data)
+			    		res.status(400).json({errors: "Error uploading picture to aws s3"});
 			        console.log(`File uploaded successfully at ${data.Location}`); 
-			     });
+		     	});
+			    
 
 		  		res.status(201).json("Successfully updated profile picture");
 		  	} catch (e) {
-		  		res.status(400).json({errors: e.message});
+		  		res.status(400).json({errors: {full_error: e, error_message: e.message}});
 		  	}
 		  }
 	);
