@@ -9,8 +9,9 @@ const fs = require('fs');
 const aws = require('aws-sdk');
 const awsConfig = require('../../config/aws-keys');
 
-// Load User model
+// Load Models
 const User = require("../../models/User");
+const Post = require("../../models/Post");
 
 const storage = multer.diskStorage({
 	// destination: (req, file, cb) => {
@@ -30,6 +31,86 @@ const validateUpdateUserInput = require("../../validation/update-user");
 const validateUpdateUserPasswordInput = require("../../validation/update-user-password");
 
 module.exports = (passport) => {
+	// Set configuration for aws s3 
+	aws.config.update({
+		  			accessKeyId: awsConfig.AWSAccessKeyId,
+		  			secretAccessKey: awsConfig.secretKey,
+		  			region: awsConfig.region
+					});
+
+	// @route POST api/restricted-users/add-new-post
+	// @desc Add new post
+	// @access Authentication needed
+	router.post("/add-new-post", 
+		  passport.authenticate('jwt', { session: false }),
+		  upload.fields([{
+          	name: 'postSound', maxCount: 1
+          }, {
+          	name: 'postPicture', maxCount: 1
+          }]),
+		  async (req, res) =>  {
+		  	let soundFileName = null, pictureFileName = null, uploadedSoundLink = null, uploadedImageLink = null;
+
+		  	// Check if recorded voice is sent and send error if not change it's name
+		  	if (!req.files.postSound) {
+		  		return res.status(400).json({errors: "Recorded voice wasn't sent"});
+		  	} else {
+		  		soundFileName = new Date().toISOString() + 'soundFile.mp3';
+		  		req.files.postSound[0].filename = soundFileName;
+		  	}
+
+		  	// Check if image was sent and if so, change it's name
+		  	if (req.files.postPicture) {
+			  	const imageFile = req.files.postPicture[0];
+		  		pictureFileName = new Date().toISOString() + imageFile.originalname;
+		  		imageFile.filename = pictureFileName;
+		  	} 
+
+		  	const s3 = new aws.S3();	
+
+		  	// Uploading audio to AWS S3 BUCKET
+	  		const audioUploadParams = {
+		         Bucket: 'voice-social-network', // bucket name
+		         Key: 'posts-audio/' + soundFileName, // file will be saved with new unique name
+		         Body: fs.createReadStream(req.files.postSound[0].path)
+		         };
+	    	const audioUploadResult = s3.upload(audioUploadParams).promise();
+	    	await audioUploadResult.then(data => {
+	    		uploadedSoundLink = data.Location
+	    		console.log(`The audio file was successfully uploaded - ${data.Location}`)
+	    	}).catch(err => {
+	    		return res.status(400).json({errors: 'Error while uploading audio file - ' + err});
+	    	});
+
+		    // Uploading image to AWS S3 BUCKET
+		    if (!req.files.postPicture) {
+		    	uploadedImageLink = 'https://voice-social-network.s3.us-east-2.amazonaws.com/post-pictures/stripes.png';
+		    } else {
+		    	const pictureUploadParams = {
+		         Bucket: 'voice-social-network', // bucket name
+		         Key: 'post-pictures/' + pictureFileName, // file will be saved with new unique name
+		         Body: fs.createReadStream(req.files.postPicture[0].path)
+		         };
+			    const pictureUploadResult = s3.upload(pictureUploadParams).promise();
+			    await pictureUploadResult.then(data => {
+			    	uploadedImageLink = data.Location;
+		    		console.log(`The picture file was successfully uploaded - ${data.Location}`);
+		    	}).catch(err => {
+		    		return res.status(400).json({errors: 'Error while uploading picture file - ' + err});
+		    	});
+		    }
+	  		
+		    // Update the use information
+		    const newPost = new Post({
+	          user_id: req.body.user_id,
+	          picture: uploadedImageLink,
+	          sound: uploadedSoundLink,
+	          description: req.body.description
+	        }).save()
+              .then(post => res.status(201).json("Post saved successfully"))
+              .catch(err => res.status(400).json({errors: "Error while saving post to database - " + err}));
+		  }
+	);
 
 	// @route POST api/restricted-users/update-user-avatar-picture
 	// @desc Update user data
@@ -57,11 +138,11 @@ module.exports = (passport) => {
 
 		  		// FETCHING ALL BUCKET DATA
 		  		// aws.config.setPromiseDependency();
-		  		aws.config.update({
-		  			accessKeyId: awsConfig.AWSAccessKeyId,
-		  			secretAccessKey: awsConfig.secretKey,
-		  			region: awsConfig.region
-		  		});
+		  		// aws.config.update({
+		  		// 	accessKeyId: awsConfig.AWSAccessKeyId,
+		  		// 	secretAccessKey: awsConfig.secretKey,
+		  		// 	region: awsConfig.region
+		  		// });
 
 		  		const s3 = new aws.S3();
 		  		// const response = await s3.listObjectsV2({
