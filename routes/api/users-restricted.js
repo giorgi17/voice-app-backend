@@ -4,6 +4,8 @@ const bcrypt = require("bcryptjs");
 const multer = require('multer');
 const crypto = require('crypto');
 const fs = require('fs');
+const { getAudioDurationInSeconds } = require('get-audio-duration');
+const TimeFormat = require('hh-mm-ss');
 
 // Aws
 const aws = require('aws-sdk');
@@ -37,6 +39,45 @@ module.exports = (passport) => {
 		  			secretAccessKey: awsConfig.secretKey,
 		  			region: awsConfig.region
 					});
+
+	// @route POST api/restricted-users/get-posts-with-page
+	// @desc Get posts based on page number
+	// @access Authentication needed
+	router.get("/get-posts-with-page", 
+		  passport.authenticate('jwt', { session: false }),
+		  async (req, res) =>  {
+		    // Fetch the posts
+		    try {
+		        let page = parseInt(req.query.page);
+		        const posts = await Post.find()
+		            .sort( { created_at: -1 } )
+		            .skip(page).limit(page+10);
+
+		        const postsTransformed = await Promise.all(posts.map( async item => {
+		        	// Calculate duration for each audio and return as string
+		        	const itemObj = item.toObject();
+		        	await getAudioDurationInSeconds(itemObj.sound).then((duration) => {
+					  const secondsRounded = Math.round(duration);
+					  itemObj.audio_duration =  TimeFormat.fromS(secondsRounded, 'hh:mm:ss'); 
+					});
+
+		        	// Find user by id for profile image and username
+		    		await User.findOne({ _id: itemObj.user_id }).then(user => {
+		    			itemObj.profile_picture = user.avatarImage;
+		    			itemObj.user_name = user.name;
+		    		});
+
+		        	delete itemObj.user_id;
+		        	return itemObj;
+		        }));
+
+		        res.status(201).json(postsTransformed);  
+		    } catch (err) {
+		        res.status(400).json({error: err.message});
+		    }
+		    
+		  }
+	);
 
 	// @route POST api/restricted-users/add-new-post
 	// @desc Add new post
