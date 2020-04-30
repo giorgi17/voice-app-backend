@@ -40,6 +40,36 @@ module.exports = (passport) => {
 		  			region: awsConfig.region
 					});
 
+	// @route POST api/restricted-users/get-user-search-result-data
+	// @desc Fetch search results
+	// @access Authentication needed
+	router.post("/get-user-search-result-data",
+		passport.authenticate('jwt', { session: false }),
+		async (req, res) => {
+			let users;
+		    if (req.body.searchText){
+		    	try {
+		    		const searchText = req.body.searchText;
+		    		const splitText = searchText.split(' ');
+		    		const splitTextFiltered = splitText.filter(item => {
+		    			return item !== '';
+		    		});
+		    		let finalStringForRegex = splitTextFiltered.join('|');
+		    		const regexp = new RegExp(finalStringForRegex, 'i');
+		    		users = await User.find({name: {$regex: regexp}}, {name: 1, avatarImage: 1});
+		    		// return res.status(400).json({users});
+		    	} catch (e) {
+		    		res.status(400).json({errors: e.message});
+		    	}
+		    } else {
+		    	res.status(400).json({errors: "Searchtext wasn't provided!"});
+		    }
+
+		    if (users) {
+		      res.status(201).json({users});
+		    }
+		});
+
 	// @route POST api/restricted-users/get-post-author-user-posts
 	// @desc Get post author posts based on page number
 	// @access Authentication needed
@@ -48,9 +78,18 @@ module.exports = (passport) => {
 		  async (req, res) =>  {
 		    // Fetch the posts
 		    try {
-		    	let post = await Post.findOne( { _id: req.body.id } );
+		    	// If user profile is opened through search 'user_id' is sent else 'id' is sent for post id
+		    	let user_id;
+		    	if (req.body.user_id) {
+		    			user_id = req.body.user_id;
+		    		} else if (req.body.id) {
+		    			let post = await Post.findOne( { _id: req.body.id } );
+		    			user_id = post.user_id;
+		    		}
+
+		    	// let post = await Post.findOne( { _id: req.body.id } );
 		        let page = parseInt(req.body.page);
-		        const posts = await Post.find({ user_id: post.user_id })
+		        const posts = await Post.find({ user_id: user_id })
 		            .sort( { created_at: -1 } )
 		            .skip(page).limit(page+10);
 
@@ -87,11 +126,18 @@ module.exports = (passport) => {
 		passport.authenticate('jwt', { session: false }),
 		async (req, res) => {
 			let user;
-		    if (req.body.id){
+		    if (!req.body.id || !req.body.user_id){
 		    	try {
-		    		let post = await Post.findOne( { _id: req.body.id } );
-		    		user = await User.findOne( { _id: post.user_id } );
-		    		console.log(user);
+		    		// If user profile is opened through search 'user_id' is sent else 'id' is sent for post id
+		    		let user_id;
+		    		if (req.body.user_id) {
+		    			user_id = req.body.user_id;
+		    		} else if (req.body.id) {
+		    			let post = await Post.findOne( { _id: req.body.id } );
+		    			user_id = post.user_id;
+		    		}
+
+		    		user = await User.findOne( { _id: user_id } );
 		    	} catch (e) {
 		    		res.status(400).json({errors: e.message});
 		    	}
