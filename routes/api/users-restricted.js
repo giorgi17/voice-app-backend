@@ -14,6 +14,7 @@ const awsConfig = require('../../config/aws-keys');
 // Load Models
 const User = require("../../models/User");
 const Post = require("../../models/Post");
+const Follower = require("../../models/Follower");
 
 const storage = multer.diskStorage({
 	// destination: (req, file, cb) => {
@@ -39,6 +40,76 @@ module.exports = (passport) => {
 		  			secretAccessKey: awsConfig.secretKey,
 		  			region: awsConfig.region
 					});
+
+	// @route POST api/restricted-users/follow-or-unfollow"
+	// @desc follow or unfollow certain user
+	// @access Authentication needed
+	router.post("/follow-or-unfollow",
+		passport.authenticate('jwt', { session: false }),
+		async (req, res) => {
+	    	try {
+	    		// If user profile is opened through search 'user_id' is sent else 'id' is sent for post id
+		    	let user_id;
+		    	if (req.body.user_id) {
+	    			user_id = req.body.user_id;
+	    		} else if (req.body.id) {
+	    			let post = await Post.findOne( { _id: req.body.id } );
+	    			user_id = post.user_id;
+	    		}
+	    		// Check if ids are not the same
+	    		if (user_id === req.body.current_user_id)
+	    			return;
+
+	    		followData = await Follower.findOne({followed_id: user_id, follower_id: req.body.current_user_id});
+	    		if (followData) {
+	    			Follower.deleteOne({followed_id: user_id, follower_id: req.body.current_user_id})
+	    			.then(() => res.status(201).json({message: "Follower removed successfully", following: false}));
+	    		}
+	    		else {
+	    			const newFollower = new Follower({
+			          followed_id: user_id,
+			          follower_id: req.body.current_user_id
+			        }).save()
+		              .then(post => res.status(201).json({message: "Follower saved successfully", following: true}))
+		              .catch(err => res.status(400).json({errors: "Error while saving Follower to database - " + err}));
+	    		}
+
+	    		return;
+	    	} catch (e) {
+	    		res.status(400).json({errors: e.message});
+	    	}
+		});
+
+	// @route POST api/restricted-users/get-user-following-data
+	// @desc Fetch following information
+	// @access Authentication needed
+	router.post("/get-user-following-data",
+		passport.authenticate('jwt', { session: false }),
+		async (req, res) => {
+			let following;
+	    	try {
+	    		// If user profile is opened through search 'user_id' is sent else 'id' is sent for post id
+		    	let user_id;
+		    	if (req.body.user_id) {
+	    			user_id = req.body.user_id;
+	    		} else if (req.body.id) {
+	    			let post = await Post.findOne( { _id: req.body.id } );
+	    			user_id = post.user_id;
+	    		}
+	    		// Check if ids are not the same
+	    		if (user_id === req.body.current_user_id)
+	    			return;
+
+	    		followData = await Follower.findOne({followed_id: user_id, follower_id: req.body.current_user_id});
+	    		if (followData)
+	    			return res.status(201).json({following: true});
+	    		else 
+	    			return res.status(201).json({following: false});
+	    		return;
+	    	} catch (e) {
+	    		res.status(400).json({errors: e.message});
+	    	}
+		});
 
 	// @route POST api/restricted-users/get-user-search-result-data
 	// @desc Fetch search results
@@ -81,11 +152,11 @@ module.exports = (passport) => {
 		    	// If user profile is opened through search 'user_id' is sent else 'id' is sent for post id
 		    	let user_id;
 		    	if (req.body.user_id) {
-		    			user_id = req.body.user_id;
-		    		} else if (req.body.id) {
-		    			let post = await Post.findOne( { _id: req.body.id } );
-		    			user_id = post.user_id;
-		    		}
+	    			user_id = req.body.user_id;
+	    		} else if (req.body.id) {
+	    			let post = await Post.findOne( { _id: req.body.id } );
+	    			user_id = post.user_id;
+	    		}
 
 		    	// let post = await Post.findOne( { _id: req.body.id } );
 		        let page = parseInt(req.body.page);
@@ -146,7 +217,7 @@ module.exports = (passport) => {
 		    }
 
 		    if (user) {
-		      res.status(201).json({name: user.name, email: user.email, avatarImage: user.avatarImage});
+		      res.status(201).json({user_id: user._id, name: user.name, email: user.email, avatarImage: user.avatarImage});
 		    }
 		});
 
