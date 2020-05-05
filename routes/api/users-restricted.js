@@ -15,6 +15,8 @@ const awsConfig = require('../../config/aws-keys');
 const User = require("../../models/User");
 const Post = require("../../models/Post");
 const Follower = require("../../models/Follower");
+const Like = require("../../models/Like");
+const Dislike = require("../../models/Dislike");
 
 const storage = multer.diskStorage({
 	// destination: (req, file, cb) => {
@@ -40,6 +42,78 @@ module.exports = (passport) => {
 		  			secretAccessKey: awsConfig.secretKey,
 		  			region: awsConfig.region
 					});
+
+	// @route POST api/restricted-users/post-dislike"
+	// @desc dislike post
+	// @access Authentication needed
+	router.post("/post-dislike",
+		passport.authenticate('jwt', { session: false }),
+		async (req, res) => {
+	    	try {
+	    		
+	    		// Check if post_id is sent
+	    		if (!req.body.post_id || !req.body.user_id)
+	    			return res.status(400).json({errors: "post_id or user_id wasn't provided."});
+
+	    		checkForExistingDislike = await Dislike.findOne({user_id: req.body.user_id, post_id: req.body.post_id});
+	    		if (checkForExistingDislike)
+	    			return res.status(400).json({errors: "This post is already disliked by this user."});
+
+	    		// Adding like
+	    		const newDislike = new Dislike({
+			          user_id: req.body.user_id,
+			          post_id: req.body.post_id
+			        }).save()
+		              .then(async like => {
+		              	// Delete like
+		              	let likeData = await Like.findOne({user_id: req.body.user_id, post_id: req.body.post_id});
+			    		if (likeData) {
+			    			await Like.deleteOne({user_id: req.body.user_id, post_id: req.body.post_id});
+			    		}
+		              	return res.status(201).json({message: "post disliked successfully", disliked: true});
+		              })
+		              .catch(err => res.status(400).json({errors: "Error while saving dislike to database - " + err}));
+
+	    	} catch (e) {
+	    		res.status(400).json({errors: e.message});
+	    	}
+		});
+
+	// @route POST api/restricted-users/post-like"
+	// @desc like post
+	// @access Authentication needed
+	router.post("/post-like",
+		passport.authenticate('jwt', { session: false }),
+		async (req, res) => {
+	    	try {
+	    		
+	    		// Check if post_id is sent
+	    		if (!req.body.post_id || !req.body.user_id)
+	    			return res.status(400).json({errors: "post_id or user_id wasn't provided."});
+
+	    		checkForExistingLike = await Like.findOne({user_id: req.body.user_id, post_id: req.body.post_id});
+	    		if (checkForExistingLike)
+	    			return res.status(400).json({errors: "This post is already liked by this user."});
+
+	    		// Adding like
+	    		const newLike = new Like({
+			          user_id: req.body.user_id,
+			          post_id: req.body.post_id
+			        }).save()
+		              .then(async like => {
+		              	// Delete dislike
+		              	let dislikeData = await Dislike.findOne({user_id: req.body.user_id, post_id: req.body.post_id});
+			    		if (dislikeData) {
+			    			await Dislike.deleteOne({user_id: req.body.user_id, post_id: req.body.post_id});
+			    		}
+		              	return res.status(201).json({message: "post liked successfully", liked: true});
+		              })
+		              .catch(err => res.status(400).json({errors: "Error while saving like to database - " + err}));
+
+	    	} catch (e) {
+	    		res.status(400).json({errors: e.message});
+	    	}
+		});
 
 	// @route POST api/restricted-users/follow-or-unfollow"
 	// @desc follow or unfollow certain user
@@ -70,7 +144,7 @@ module.exports = (passport) => {
 			          followed_id: user_id,
 			          follower_id: req.body.current_user_id
 			        }).save()
-		              .then(post => res.status(201).json({message: "Follower saved successfully", following: true}))
+		              .then(follower => res.status(201).json({message: "Follower saved successfully", following: true}))
 		              .catch(err => res.status(400).json({errors: "Error while saving Follower to database - " + err}));
 	    		}
 
@@ -230,6 +304,8 @@ module.exports = (passport) => {
 		    // Fetch the posts
 		    try {
 		        let page = parseInt(req.query.page);
+		        let user_id = req.query.user_id;
+		        console.log(user_id);
 		        const posts = await Post.find()
 		            .sort( { created_at: -1 } )
 		            .skip(page).limit(page+10);
@@ -241,6 +317,20 @@ module.exports = (passport) => {
 					  const secondsRounded = Math.round(duration);
 					  itemObj.audio_duration =  TimeFormat.fromS(secondsRounded, 'hh:mm:ss'); 
 					});
+
+		        	// See if the post is liked or disliked by the user 
+	              	let likeData = await Like.findOne({user_id: user_id, post_id: itemObj._id});
+	              	let dislikeData = await Dislike.findOne({user_id: user_id, post_id: itemObj._id});
+		    		if (likeData) {
+		    			itemObj.liked = true;
+		    			itemObj.disliked = false;
+		    		} else if (dislikeData) {
+		    			itemObj.disliked = true;
+		    			itemObj.liked = false;
+		    		} else {
+		    			itemObj.liked = false;
+		    			itemObj.disliked = false;
+		    		}
 
 		        	// Find user by id for profile image and username
 		    		await User.findOne({ _id: itemObj.user_id }).then(user => {
