@@ -9,7 +9,11 @@ const FollowerSchema = new Schema({
   follower_id: {
     type: String,
     required: true
-  }
+  },
+  date: {
+    type: Date,
+    default: Date.now
+  },
 });
 
 module.exports = Follower = mongoose.model("followers", FollowerSchema);

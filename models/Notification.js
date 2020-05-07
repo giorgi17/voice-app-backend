@@ -1,21 +1,30 @@
 const mongoose = require("mongoose");
 const Schema = mongoose.Schema;
 // Create Schema
-const UserSchema = new Schema({
-  name: {
+const NotificationsSchema = new Schema({
+  user_id: {
     type: String,
     required: true
   },
-  email: {
+  action_taker_user_id: {
     type: String,
     required: true
   },
-  password: {
+  text: {
     type: String,
     required: true
   },
-  avatarImage: {
+  type: {
     type: String,
+    required: true
+  },
+  // Who was affected by action, (Followed who, liked which post...)
+  target: {
+    type: String,
+    required: true
+  },
+  seen: {
+    type: Boolean,
     required: true
   },
   created_at: {
@@ -28,4 +37,4 @@ const UserSchema = new Schema({
   }
 });
 
-module.exports = User = mongoose.model("users", UserSchema);
+module.exports = Notifications = mongoose.model("notifications", NotificationsSchema);

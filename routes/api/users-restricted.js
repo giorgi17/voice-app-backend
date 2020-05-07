@@ -17,6 +17,7 @@ const Post = require("../../models/Post");
 const Follower = require("../../models/Follower");
 const Like = require("../../models/Like");
 const Dislike = require("../../models/Dislike");
+const Notification = require("../../models/Notification");
 
 const storage = multer.diskStorage({
 	// destination: (req, file, cb) => {
@@ -43,6 +44,127 @@ module.exports = (passport) => {
 		  			region: awsConfig.region
 					});
 
+
+	// @route POST api/restricted-users/get-post-picture-for-notifications
+	// @desc Fetch user profile picture to display in notifications panel
+	// @access Authentication needed
+	// TODO don't sent current password
+	router.post("/get-post-picture-for-notifications",
+		passport.authenticate('jwt', { session: false }),
+		async (req, res) => {
+		    if (req.body.post_id){
+		    	try {
+		    		let post = await Post.findOne({ _id: req.body.post_id });
+		    		if (post)
+		    			return res.status(201).json({postPicture: post.picture});
+		    	} catch (e) {
+		    		res.status(400).json({errors: e.message});
+		    	}
+		    } else {
+		    	res.status(400).json({errors: "post_id id wasn't provided!"});
+		    }
+
+		    // if (user) {
+		    //   res.status(201).json({avatarImage: user.avatarImage});
+		    // }
+		});
+
+	// @route POST api/restricted-users/seen-notification
+	// @desc After user opens notifications, update and make them 'seen'
+	// @access Authentication needed
+	// TODO don't sent current password
+	router.post("/seen-notification",
+		passport.authenticate('jwt', { session: false }),
+		async (req, res) => {
+		    if (req.body.ids){
+		    	try {
+		    		notificationsUpdate = await Notification.updateMany(
+		    			{_id: { $in: req.body.ids }},
+		    			{$set: { seen: true, updated_at: Date.now() }}
+		    		);
+
+		    		if (notificationsUpdate)
+		    			return res.status(201).json("Notification seen update complete.");
+		    	} catch (e) {
+		    		res.status(400).json({errors: e.message});
+		    	}
+		    } else {
+		    	res.status(400).json({errors: "Notification ids weren't provided!"});
+		    }
+
+		    // if (user) {
+		    //   res.status(201).json({avatarImage: user.avatarImage});
+		    // }
+		});
+
+	// @route POST api/restricted-users/get-user-profile-picture-for-notifications
+	// @desc Fetch user profile picture to display in notifications panel
+	// @access Authentication needed
+	// TODO don't sent current password
+	router.post("/get-user-profile-picture-for-notifications",
+		passport.authenticate('jwt', { session: false }),
+		async (req, res) => {
+			let user;
+		    if (req.body.id){
+		    	try {
+		    		user = await User.findOne( { _id: req.body.id } );
+		    	} catch (e) {
+		    		res.status(400).json({errors: e.message});
+		    	}
+		    } else {
+		    	res.status(400).json({errors: "User id wasn't provided!"});
+		    }
+
+		    if (user) {
+		      res.status(201).json({avatarImage: user.avatarImage});
+		    }
+		});
+
+
+	// @route POST api/restricted-users/get-notification-data"
+	// @desc get notification data
+	// @access Authentication needed
+	router.post("/get-notification-data",
+		passport.authenticate('jwt', { session: false }),
+		async (req, res) => {
+	    	try {
+	    		// Check if post_id is sent
+	    		if (!req.body.user_id)
+	    			return res.status(400).json({errors: "user_id wasn't provided."});
+
+		        let page = parseInt(req.body.page);
+		        const notifications = await Notification.find({ user_id: req.body.user_id })
+		            .sort( { created_at: -1 } )
+		            .skip(page).limit(page+10);
+
+	    		// Fetching unseen notifications
+	    		// const notifications = await Notification.find({user_id: req.body.user_id, seen: false});
+	  			return res.status(201).json({notifications: notifications});
+
+	    	} catch (e) {
+	    		res.status(400).json({errors: e.message});
+	    	}
+		});
+
+	// @route POST api/restricted-users/get-notification-number-data"
+	// @desc get notification number data
+	// @access Authentication needed
+	router.post("/get-notification-number-data",
+		passport.authenticate('jwt', { session: false }),
+		async (req, res) => {
+	    	try {
+	    		// Check if post_id is sent
+	    		if (!req.body.user_id)
+	    			return res.status(400).json({errors: "user_id wasn't provided."});
+	    		// Counting unseen notifications
+	    		const notificationsNumber = await Notification.find({user_id: req.body.user_id, seen: false}).countDocuments();
+	  			return res.status(201).json({notification: notificationsNumber});
+
+	    	} catch (e) {
+	    		res.status(400).json({errors: e.message});
+	    	}
+		});
+
 	// @route POST api/restricted-users/post-dislike"
 	// @desc dislike post
 	// @access Authentication needed
@@ -52,8 +174,8 @@ module.exports = (passport) => {
 	    	try {
 	    		
 	    		// Check if post_id is sent
-	    		if (!req.body.post_id || !req.body.user_id)
-	    			return res.status(400).json({errors: "post_id or user_id wasn't provided."});
+	    		if (!req.body.post_id || !req.body.user_id || !req.body.post_author_id || !req.body.current_user_name)
+	    			return res.status(400).json({errors: "post_id or user_id or post_author_id or current_user_name wasn't provided."});
 
 	    		checkForExistingDislike = await Dislike.findOne({user_id: req.body.user_id, post_id: req.body.post_id});
 	    		if (checkForExistingDislike)
@@ -70,6 +192,17 @@ module.exports = (passport) => {
 			    		if (likeData) {
 			    			await Like.deleteOne({user_id: req.body.user_id, post_id: req.body.post_id});
 			    		}
+
+			    		// Saving notification for disliking post
+		    			const newNotification = await new Notification({
+			              		user_id: req.body.post_author_id,
+			              		action_taker_user_id: req.body.user_id,
+			              		text: '<b>' + req.body.current_user_name + '</b> Disliked your post.',
+			              		type: 'post-disliking',
+			              		target: req.body.post_id,
+			              		seen: false 
+			              	}).save();
+	
 		              	return res.status(201).json({message: "post disliked successfully", disliked: true});
 		              })
 		              .catch(err => res.status(400).json({errors: "Error while saving dislike to database - " + err}));
@@ -88,8 +221,8 @@ module.exports = (passport) => {
 	    	try {
 	    		
 	    		// Check if post_id is sent
-	    		if (!req.body.post_id || !req.body.user_id)
-	    			return res.status(400).json({errors: "post_id or user_id wasn't provided."});
+	    		if (!req.body.post_id || !req.body.user_id || !req.body.post_author_id || !req.body.current_user_name)
+	    			return res.status(400).json({errors: "post_id or user_id or post_author_id or current_user_name wasn't provided."});
 
 	    		checkForExistingLike = await Like.findOne({user_id: req.body.user_id, post_id: req.body.post_id});
 	    		if (checkForExistingLike)
@@ -106,6 +239,17 @@ module.exports = (passport) => {
 			    		if (dislikeData) {
 			    			await Dislike.deleteOne({user_id: req.body.user_id, post_id: req.body.post_id});
 			    		}
+
+			    		// Saving notification for liking post
+		    			const newNotification = await new Notification({
+			              		user_id: req.body.post_author_id,
+			              		action_taker_user_id: req.body.user_id,
+			              		text: '<b>' + req.body.current_user_name + '</b> Liked your post.',
+			              		type: 'post-liking',
+			              		target: req.body.post_id,
+			              		seen: false 
+			              	}).save();
+
 		              	return res.status(201).json({message: "post liked successfully", liked: true});
 		              })
 		              .catch(err => res.status(400).json({errors: "Error while saving like to database - " + err}));
@@ -132,7 +276,7 @@ module.exports = (passport) => {
 	    		}
 	    		// Check if ids are not the same
 	    		if (user_id === req.body.current_user_id)
-	    			return;
+	    			return res.status(400).json({errors: "You aren't enable to follow yourself."});
 
 	    		followData = await Follower.findOne({followed_id: user_id, follower_id: req.body.current_user_id});
 	    		if (followData) {
@@ -140,15 +284,28 @@ module.exports = (passport) => {
 	    			.then(() => res.status(201).json({message: "Follower removed successfully", following: false}));
 	    		}
 	    		else {
-	    			const newFollower = new Follower({
-			          followed_id: user_id,
-			          follower_id: req.body.current_user_id
-			        }).save()
-		              .then(follower => res.status(201).json({message: "Follower saved successfully", following: true}))
-		              .catch(err => res.status(400).json({errors: "Error while saving Follower to database - " + err}));
-	    		}
+	    			try {
+			             // Saving follower
+			             const newFollower = await new Follower({
+				          followed_id: user_id,
+				          follower_id: req.body.current_user_id
+				        }).save();
+		    			// Saving notification for follower
+		    			const newNotification = await new Notification({
+			              		user_id: user_id,
+			              		action_taker_user_id: req.body.current_user_id,
+			              		text: '<b>' + req.body.current_user_name + '</b> started following you.',
+			              		type: 'following',
+			              		target: user_id,
+			              		seen: false 
+			              	}).save();
+		    			if (newFollower)
+		    				return res.status(201).json({message: "Follower saved successfully", following: true});
 
-	    		return;
+	    			} catch(err) {
+	    				return res.status(400).json({errors: "Error while saving Follower to database - " + err});
+	    			};
+	    		}
 	    	} catch (e) {
 	    		res.status(400).json({errors: e.message});
 	    	}
@@ -305,7 +462,6 @@ module.exports = (passport) => {
 		    try {
 		        let page = parseInt(req.query.page);
 		        let user_id = req.query.user_id;
-		        console.log(user_id);
 		        const posts = await Post.find()
 		            .sort( { created_at: -1 } )
 		            .skip(page).limit(page+10);
@@ -338,7 +494,6 @@ module.exports = (passport) => {
 		    			itemObj.user_name = user.name;
 		    		});
 
-		        	delete itemObj.user_id;
 		        	return itemObj;
 		        }));
 

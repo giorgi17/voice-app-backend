@@ -9,7 +9,11 @@ const DislikesSchema = new Schema({
   post_id: {
     type: String,
     required: true
-  }
+  },
+   date: {
+    type: Date,
+    default: Date.now
+  },
 });
 
 module.exports = Dislikes = mongoose.model("dislikes", DislikesSchema);
