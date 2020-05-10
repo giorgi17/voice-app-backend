@@ -313,7 +313,8 @@ module.exports = (passport) => {
 		        let page = parseInt(req.body.page);
 		        const notifications = await Notification.find({ user_id: req.body.user_id })
 		            .sort( { created_at: -1 } )
-		            .skip(page).limit(page+10);
+		            // .skip(page).limit(page+10);
+		            .skip(page).limit(10);
 
 	    		// Fetching unseen notifications
 	    		// const notifications = await Notification.find({user_id: req.body.user_id, seen: false});
@@ -575,7 +576,8 @@ module.exports = (passport) => {
 		        let page = parseInt(req.body.page);
 		        const posts = await Post.find({ user_id: user_id })
 		            .sort( { created_at: -1 } )
-		            .skip(page).limit(page+10);
+		            // .skip(page).limit(page+10);
+		            .skip(page).limit(10);
 
 		        const postsTransformed = await Promise.all(posts.map( async item => {
 		        	// Calculate duration for each audio and return as string
@@ -646,7 +648,8 @@ module.exports = (passport) => {
 		        let user_id = req.query.user_id;
 		        const posts = await Post.find()
 		            .sort( { created_at: -1 } )
-		            .skip(page).limit(page+10);
+		            // .skip(page).limit(page+10);
+		            .skip(page).limit(10);
 
 		        const postsTransformed = await Promise.all(posts.map( async item => {
 		        	// Calculate duration for each audio and return as string
