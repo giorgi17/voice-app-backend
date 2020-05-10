@@ -18,6 +18,7 @@ const Follower = require("../../models/Follower");
 const Like = require("../../models/Like");
 const Dislike = require("../../models/Dislike");
 const Notification = require("../../models/Notification");
+const Comment = require("../../models/Comment");
 
 const storage = multer.diskStorage({
 	// destination: (req, file, cb) => {
@@ -45,10 +46,193 @@ module.exports = (passport) => {
 					});
 
 
+	// @route POST api/restricted-users/get-next-comments-with-page
+	// @desc Get next comments based on page number
+	// @access Authentication needed
+	router.get("/get-next-comments-with-page", 
+		  passport.authenticate('jwt', { session: false }),
+		  async (req, res) =>  {
+		    // Fetch the posts
+		    try {
+
+		        let page = parseInt(req.query.page);
+		        let post_id = req.query.post_id;
+		        const comments = await Comment.find({post_id: post_id})
+		        	.sort( { created_at: -1 } )
+		        	.skip(0).limit(page+10);
+
+	        	let ReversedCommentsToSend = [];
+	    		// Sending last comments in reverse order. From bottom to top
+	    		comments.forEach((item, index) => {
+
+	    			if (index === comments.length - 1) {
+	    				ReversedCommentsToSend.push(item.toObject());
+	    				ReversedCommentsToSend.reverse();
+	    				return;
+	    			}
+	    			ReversedCommentsToSend.push(item.toObject());
+	    		});
+
+	    		console.log()
+
+		        if (comments)
+					return res.status(201).json({comments: ReversedCommentsToSend});  
+		    } catch (err) {
+		        res.status(400).json({error: err.message});
+		    }
+		    
+		  }
+	);
+
+	// @route POST api/restricted-users/get-comments-with-page
+	// @desc Get previous comments based on page number
+	// @access Authentication needed
+	router.get("/get-comments-with-page", 
+		  passport.authenticate('jwt', { session: false }),
+		  async (req, res) =>  {
+		    // Fetch the posts
+		    try {
+
+		    	// const posts = await Post.find()
+		     //        .sort( { created_at: -1 } )
+		     //        .skip(page).limit(page+10);
+
+		        let page = parseInt(req.query.page);
+		        let post_id = req.query.post_id;
+		        const comments = await Comment.find({post_id: post_id})
+		        	.sort( { created_at: -1 } )
+		        	// .skip(page).limit(page+10);
+		        	.skip(page).limit(10);
+
+	        	let ReversedCommentsToSend = [];
+	    		// Sending last comments in reverse order. From bottom to top
+	    		comments.forEach((item, index) => {
+
+	    			if (index === comments.length - 1) {
+	    				ReversedCommentsToSend.push(item.toObject());
+	    				ReversedCommentsToSend.reverse();
+	    				return;
+	    			}
+	    			ReversedCommentsToSend.push(item.toObject());
+	    		});
+
+		        if (comments)
+					return res.status(201).json({comments: ReversedCommentsToSend});  
+		    } catch (err) {
+		        res.status(400).json({error: err.message});
+		    }
+		    
+		  }
+	);
+
+	// @route POST api/restricted-users/fetch-initial-comments-for-post
+	// @desc Fetch comments for post
+	// @access Authentication needed
+	router.post("/fetch-initial-comments-for-post",
+		passport.authenticate('jwt', { session: false }),
+		async (req, res) => {
+		    if (req.body.post_id){
+		    	try {
+
+		    		let comments = await Comment.find({ post_id: req.body.post_id })
+		    			.sort( { created_at: -1 } ).limit(4);
+		    		let initialCommentsToSend = [];
+		    		// Only send three comments when post first renders and also see if there are more than 3
+		    		comments.forEach((item, index) => {
+		    			initialCommentsToSend.push(item.toObject());
+		    		});
+
+		    		if (comments.length === 4) 
+		    			initialCommentsToSend.pop();
+
+		    		initialCommentsToSend.reverse();
+	
+		    		if (comments.length < 4) {
+		    			return res.status(201).json({comments: initialCommentsToSend, hasMore: false});
+		    		} else {
+		    			return res.status(201).json({comments: initialCommentsToSend, hasMore: true});
+		    		}
+
+		    	} catch (e) {
+		    		res.status(400).json({errors: e.message});
+		    	}
+		    } else {
+		    	res.status(400).json({errors: "post_id id wasn't provided!"});
+		    }
+		});
+
+	// @route POST api/restricted-users/add-new-comment
+	// @desc Add a new comment
+	// @access Authentication needed
+	router.post("/add-new-comment",
+		passport.authenticate('jwt', { session: false }),
+		async (req, res) => {
+		    if (req.body.user_id){
+		    	try {
+
+		    		// Check if post_id is sent
+		    		if (!req.body.post_id || !req.body.user_id || 
+		    				!req.body.post_author_id || !req.body.current_user_name || !req.body.content)
+		    			return res.status(400).json({errors: "post_id or user_id or post_author_id or current_user_name or content wasn't provided."});
+
+		    		// Check if comment content is not empty
+		    		if (req.body.content === '')
+		    			return res.status(400).json({errors: "Comment content is empty!"});
+
+		    		let comment = await Comment.findOne({ _id: req.body.user_id });
+		    		// Adding like
+		    		const newComment = new Comment({
+				          user_id: req.body.user_id,
+				          post_id: req.body.post_id,
+				          user_name: req.body.current_user_name,
+				          content: req.body.content
+				        }).save().then(async comment => {
+				        	// Check if action taker is the same as post author to not show notification
+				        	if (req.body.post_author_id !== req.body.user_id) {
+				        		// Saving notification for commenting on a post
+				    			const newNotification = await new Notification({
+					              		user_id: req.body.post_author_id,
+					              		action_taker_user_id: req.body.user_id,
+					              		text: '<b>' + req.body.current_user_name + '</b> Commented on your post.',
+					              		type: 'post-commenting',
+					              		target: req.body.post_id,
+					              		seen: false 
+					              	}).save();
+				        	}
+
+				        	return res.status(201).json({message: "Successfully added comment"});
+				        }).catch(err => res.status(400).json({errors: "Error while saving comment to database - " + err}));
+
+		    	} catch (e) {
+		    		res.status(400).json({errors: e.message});
+		    	}
+		    } else {
+		    	res.status(400).json({errors: "user_id id wasn't provided!"});
+		    }
+		});
+
+	// @route POST api/restricted-users/get-logged-in-user-profile-picture-for-new-comment
+	// @desc Fetch user profile picture to display in notifications panel
+	// @access Authentication needed
+	router.post("/get-logged-in-user-profile-picture-for-new-comment",
+		passport.authenticate('jwt', { session: false }),
+		async (req, res) => {
+		    if (req.body.user_id){
+		    	try {
+		    		let user = await User.findOne({ _id: req.body.user_id });
+		    		if (user)
+		    			return res.status(201).json({profilePicture: user.avatarImage});
+		    	} catch (e) {
+		    		res.status(400).json({errors: e.message});
+		    	}
+		    } else {
+		    	res.status(400).json({errors: "user_id id wasn't provided!"});
+		    }
+		});
+
 	// @route POST api/restricted-users/get-post-picture-for-notifications
 	// @desc Fetch user profile picture to display in notifications panel
 	// @access Authentication needed
-	// TODO don't sent current password
 	router.post("/get-post-picture-for-notifications",
 		passport.authenticate('jwt', { session: false }),
 		async (req, res) => {
@@ -63,16 +247,11 @@ module.exports = (passport) => {
 		    } else {
 		    	res.status(400).json({errors: "post_id id wasn't provided!"});
 		    }
-
-		    // if (user) {
-		    //   res.status(201).json({avatarImage: user.avatarImage});
-		    // }
 		});
 
 	// @route POST api/restricted-users/seen-notification
 	// @desc After user opens notifications, update and make them 'seen'
 	// @access Authentication needed
-	// TODO don't sent current password
 	router.post("/seen-notification",
 		passport.authenticate('jwt', { session: false }),
 		async (req, res) => {
@@ -100,7 +279,6 @@ module.exports = (passport) => {
 	// @route POST api/restricted-users/get-user-profile-picture-for-notifications
 	// @desc Fetch user profile picture to display in notifications panel
 	// @access Authentication needed
-	// TODO don't sent current password
 	router.post("/get-user-profile-picture-for-notifications",
 		passport.authenticate('jwt', { session: false }),
 		async (req, res) => {
@@ -192,16 +370,18 @@ module.exports = (passport) => {
 			    		if (likeData) {
 			    			await Like.deleteOne({user_id: req.body.user_id, post_id: req.body.post_id});
 			    		}
-
-			    		// Saving notification for disliking post
-		    			const newNotification = await new Notification({
-			              		user_id: req.body.post_author_id,
-			              		action_taker_user_id: req.body.user_id,
-			              		text: '<b>' + req.body.current_user_name + '</b> Disliked your post.',
-			              		type: 'post-disliking',
-			              		target: req.body.post_id,
-			              		seen: false 
-			              	}).save();
+			    		// Check if action taker is the same as post author to not show notification
+			    		if (req.body.post_author_id !== req.body.user_id) {
+			    			// Saving notification for disliking post
+			    			const newNotification = await new Notification({
+				              		user_id: req.body.post_author_id,
+				              		action_taker_user_id: req.body.user_id,
+				              		text: '<b>' + req.body.current_user_name + '</b> Disliked your post.',
+				              		type: 'post-disliking',
+				              		target: req.body.post_id,
+				              		seen: false 
+				              	}).save();
+			    		}
 	
 		              	return res.status(201).json({message: "post disliked successfully", disliked: true});
 		              })
@@ -239,16 +419,18 @@ module.exports = (passport) => {
 			    		if (dislikeData) {
 			    			await Dislike.deleteOne({user_id: req.body.user_id, post_id: req.body.post_id});
 			    		}
-
-			    		// Saving notification for liking post
-		    			const newNotification = await new Notification({
-			              		user_id: req.body.post_author_id,
-			              		action_taker_user_id: req.body.user_id,
-			              		text: '<b>' + req.body.current_user_name + '</b> Liked your post.',
-			              		type: 'post-liking',
-			              		target: req.body.post_id,
-			              		seen: false 
-			              	}).save();
+			    		// Check if action taker is the same as post author to not show notification
+			    		if (req.body.post_author_id !== req.body.user_id) {
+			    			// Saving notification for liking post
+			    			const newNotification = await new Notification({
+				              		user_id: req.body.post_author_id,
+				              		action_taker_user_id: req.body.user_id,
+				              		text: '<b>' + req.body.current_user_name + '</b> Liked your post.',
+				              		type: 'post-liking',
+				              		target: req.body.post_id,
+				              		seen: false 
+				              	}).save();
+			    		}
 
 		              	return res.status(201).json({message: "post liked successfully", liked: true});
 		              })
@@ -294,7 +476,7 @@ module.exports = (passport) => {
 		    			const newNotification = await new Notification({
 			              		user_id: user_id,
 			              		action_taker_user_id: req.body.current_user_id,
-			              		text: '<b>' + req.body.current_user_name + '</b> started following you.',
+			              		text: '<b>' + req.body.current_user_name + '</b> Started following you.',
 			              		type: 'following',
 			              		target: user_id,
 			              		seen: false 
@@ -409,7 +591,7 @@ module.exports = (passport) => {
 		    			itemObj.user_name = user.name;
 		    		});
 
-		        	delete itemObj.user_id;
+		        	// delete itemObj.user_id;
 		        	return itemObj;
 		        }));
 
