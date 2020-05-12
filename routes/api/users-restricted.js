@@ -647,11 +647,28 @@ module.exports = (passport) => {
 	router.get("/get-posts-with-page", 
 		  passport.authenticate('jwt', { session: false }),
 		  async (req, res) =>  {
+		  	// {_id: { $in: req.body.ids }},
 		    // Fetch the posts
 		    try {
 		        let page = parseInt(req.query.page);
 		        let user_id = req.query.user_id;
-		        const posts = await Post.find()
+		        // Filter
+		        let filter = {};
+		        if (req.query.filter === 'all') {
+		        	filter = {};
+		        } else if (req.query.filter === 'following') {
+		        	const followedUsers = await Follower.find({follower_id: user_id});
+		        	const followedUsersIds = [];
+		        	followedUsers.map(item => {
+		        		followedUsersIds.push(item.followed_id);
+		        	});
+		   
+		        	filter = {user_id: { $in: followedUsersIds}};
+		        } else if (req.query.filter === 'myPosts') {
+		        	filter = {user_id};
+		        }
+
+		        const posts = await Post.find(filter)
 		            .sort( { created_at: -1 } )
 		            // .skip(page).limit(page+10);
 		            .skip(page).limit(10);
