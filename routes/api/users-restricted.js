@@ -448,50 +448,49 @@ module.exports = (passport) => {
 	router.post("/follow-or-unfollow",
 		passport.authenticate('jwt', { session: false }),
 		async (req, res) => {
-	    	try {
-	    		// If user profile is opened through search 'user_id' is sent else 'id' is sent for post id
-		    	let user_id;
-		    	if (req.body.user_id) {
-	    			user_id = req.body.user_id;
-	    		} else if (req.body.id) {
-	    			let post = await Post.findOne( { _id: req.body.id } );
-	    			user_id = post.user_id;
-	    		}
-	    		// Check if ids are not the same
-	    		if (user_id === req.body.current_user_id)
-	    			return res.status(400).json({errors: "You aren't enable to follow yourself."});
+			if (req.body.user_id) {
+		    	try {
+		    		// If user profile is opened through search 'user_id' is sent else 'id' is sent for post id
+			    	let user_id = req.body.user_id;
 
-	    		followData = await Follower.findOne({followed_id: user_id, follower_id: req.body.current_user_id});
-	    		if (followData) {
-	    			Follower.deleteOne({followed_id: user_id, follower_id: req.body.current_user_id})
-	    			.then(() => res.status(201).json({message: "Follower removed successfully", following: false}));
-	    		}
-	    		else {
-	    			try {
-			             // Saving follower
-			             const newFollower = await new Follower({
-				          followed_id: user_id,
-				          follower_id: req.body.current_user_id
-				        }).save();
-		    			// Saving notification for follower
-		    			const newNotification = await new Notification({
-			              		user_id: user_id,
-			              		action_taker_user_id: req.body.current_user_id,
-			              		text: '<b>' + req.body.current_user_name + '</b> Started following you.',
-			              		type: 'following',
-			              		target: user_id,
-			              		seen: false 
-			              	}).save();
-		    			if (newFollower)
-		    				return res.status(201).json({message: "Follower saved successfully", following: true});
+		    		// Check if ids are not the same
+		    		if (user_id === req.body.current_user_id)
+		    			return res.status(400).json({errors: "You aren't enable to follow yourself."});
 
-	    			} catch(err) {
-	    				return res.status(400).json({errors: "Error while saving Follower to database - " + err});
-	    			};
-	    		}
-	    	} catch (e) {
-	    		res.status(400).json({errors: e.message});
-	    	}
+		    		followData = await Follower.findOne({followed_id: user_id, follower_id: req.body.current_user_id});
+		    		if (followData) {
+		    			Follower.deleteOne({followed_id: user_id, follower_id: req.body.current_user_id})
+		    			.then(() => res.status(201).json({message: "Follower removed successfully", following: false}));
+		    		}
+		    		else {
+		    			try {
+				             // Saving follower
+				             const newFollower = await new Follower({
+					          followed_id: user_id,
+					          follower_id: req.body.current_user_id
+					        }).save();
+			    			// Saving notification for follower
+			    			const newNotification = await new Notification({
+				              		user_id: user_id,
+				              		action_taker_user_id: req.body.current_user_id,
+				              		text: '<b>' + req.body.current_user_name + '</b> Started following you.',
+				              		type: 'following',
+				              		target: user_id,
+				              		seen: false 
+				              	}).save();
+			    			if (newFollower)
+			    				return res.status(201).json({message: "Follower saved successfully", following: true});
+
+		    			} catch(err) {
+		    				return res.status(400).json({errors: "Error while saving Follower to database - " + err});
+		    			};
+		    		}
+		    	} catch (e) {
+		    		res.status(400).json({errors: e.message});
+		    	}
+		    } else {
+		    	res.status(400).json({errors: "User id wasn't provided!"});
+		    }
 		});
 
 	// @route POST api/restricted-users/get-user-following-data
@@ -500,29 +499,28 @@ module.exports = (passport) => {
 	router.post("/get-user-following-data",
 		passport.authenticate('jwt', { session: false }),
 		async (req, res) => {
-			let following;
-	    	try {
-	    		// If user profile is opened through search 'user_id' is sent else 'id' is sent for post id
-		    	let user_id;
-		    	if (req.body.user_id) {
-	    			user_id = req.body.user_id;
-	    		} else if (req.body.id) {
-	    			let post = await Post.findOne( { _id: req.body.id } );
-	    			user_id = post.user_id;
-	    		}
-	    		// Check if ids are not the same
-	    		if (user_id === req.body.current_user_id)
-	    			return;
+			if (req.body.user_id) {
+				let following;
+		    	try {
+		    		// If user profile is opened through search 'user_id' is sent else 'id' is sent for post id
+			    	let user_id = req.body.user_id;
 
-	    		followData = await Follower.findOne({followed_id: user_id, follower_id: req.body.current_user_id});
-	    		if (followData)
-	    			return res.status(201).json({following: true});
-	    		else 
-	    			return res.status(201).json({following: false});
-	    		return;
-	    	} catch (e) {
-	    		res.status(400).json({errors: e.message});
-	    	}
+		    		// Check if ids are not the same
+		    		if (user_id === req.body.current_user_id)
+		    			return;
+
+		    		followData = await Follower.findOne({followed_id: user_id, follower_id: req.body.current_user_id});
+		    		if (followData)
+		    			return res.status(201).json({following: true});
+		    		else 
+		    			return res.status(201).json({following: false});
+		    		return;
+		    	} catch (e) {
+		    		res.status(400).json({errors: e.message});
+		    	}
+		    } else {
+		    	res.status(400).json({errors: "User id wasn't provided!"});
+		    }
 		});
 
 	// @route POST api/restricted-users/get-user-search-result-data
@@ -562,44 +560,57 @@ module.exports = (passport) => {
 		  passport.authenticate('jwt', { session: false }),
 		  async (req, res) =>  {
 		    // Fetch the posts
-		    try {
-		    	// If user profile is opened through search 'user_id' is sent else 'id' is sent for post id
-		    	let user_id;
-		    	if (req.body.user_id) {
-	    			user_id = req.body.user_id;
-	    		} else if (req.body.id) {
-	    			let post = await Post.findOne( { _id: req.body.id } );
-	    			user_id = post.user_id;
-	    		}
+		    if (req.body.user_id){
+			    try {
+			    	// If user profile is opened through search 'user_id' is sent else 'id' is sent for post id
+			    	let user_id = req.body.user_id;
+			    	let logged_in_user_id = req.body.logged_in_user_id;
 
-		    	// let post = await Post.findOne( { _id: req.body.id } );
-		        let page = parseInt(req.body.page);
-		        const posts = await Post.find({ user_id: user_id })
-		            .sort( { created_at: -1 } )
-		            // .skip(page).limit(page+10);
-		            .skip(page).limit(10);
+			    	// let post = await Post.findOne( { _id: req.body.id } );
+			        let page = parseInt(req.body.page);
+			        const posts = await Post.find({ user_id: user_id })
+			            .sort( { created_at: -1 } )
+			            // .skip(page).limit(page+10);
+			            .skip(page).limit(10);
 
-		        const postsTransformed = await Promise.all(posts.map( async item => {
-		        	// Calculate duration for each audio and return as string
-		        	const itemObj = item.toObject();
-		        	await getAudioDurationInSeconds(itemObj.sound).then((duration) => {
-					  const secondsRounded = Math.round(duration);
-					  itemObj.audio_duration =  TimeFormat.fromS(secondsRounded, 'hh:mm:ss'); 
-					});
+			        const postsTransformed = await Promise.all(posts.map( async item => {
+			        	// Calculate duration for each audio and return as string
+			        	const itemObj = item.toObject();
+			        	await getAudioDurationInSeconds(itemObj.sound).then((duration) => {
+						  const secondsRounded = Math.round(duration);
+						  itemObj.audio_duration =  TimeFormat.fromS(secondsRounded, 'hh:mm:ss'); 
+						});
 
-		        	// Find user by id for profile image and username
-		    		await User.findOne({ _id: itemObj.user_id }).then(user => {
-		    			itemObj.profile_picture = user.avatarImage;
-		    			itemObj.user_name = user.name;
-		    		});
+			        	// See if the post is liked or disliked by the user 
+		              	let likeData = await Like.findOne({user_id: logged_in_user_id, post_id: itemObj._id});
+		              	let dislikeData = await Dislike.findOne({user_id: logged_in_user_id, post_id: itemObj._id});
+			    		if (likeData) {
+			    			itemObj.liked = true;
+			    			itemObj.disliked = false;
+			    		} else if (dislikeData) {
+			    			itemObj.disliked = true;
+			    			itemObj.liked = false;
+			    		} else {
+			    			itemObj.liked = false;
+			    			itemObj.disliked = false;
+			    		}
 
-		        	// delete itemObj.user_id;
-		        	return itemObj;
-		        }));
+			        	// Find user by id for profile image and username
+			    		await User.findOne({ _id: itemObj.user_id }).then(user => {
+			    			itemObj.profile_picture = user.avatarImage;
+			    			itemObj.user_name = user.name;
+			    		});
 
-		        res.status(201).json(postsTransformed);  
-		    } catch (err) {
-		        res.status(400).json({error: err.message});
+			        	// delete itemObj.user_id;
+			        	return itemObj;
+			        }));
+
+			        res.status(201).json(postsTransformed);  
+			    } catch (err) {
+			        res.status(400).json({error: err.message});
+			    }
+			} else {
+		    	res.status(400).json({errors: "User id wasn't provided!"});
 		    }
 		    
 		  }
@@ -612,16 +623,10 @@ module.exports = (passport) => {
 		passport.authenticate('jwt', { session: false }),
 		async (req, res) => {
 			let user;
-		    if (!req.body.id || !req.body.user_id){
+		    if (req.body.user_id){
 		    	try {
 		    		// If user profile is opened through search 'user_id' is sent else 'id' is sent for post id
-		    		let user_id;
-		    		if (req.body.user_id) {
-		    			user_id = req.body.user_id;
-		    		} else if (req.body.id) {
-		    			let post = await Post.findOne( { _id: req.body.id } );
-		    			user_id = post.user_id;
-		    		}
+		    		let user_id = req.body.user_id;
 
 		    		user = await User.findOne( { _id: user_id } );
 		    	} catch (e) {
