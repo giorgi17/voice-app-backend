@@ -19,6 +19,7 @@ const Like = require("../../models/Like");
 const Dislike = require("../../models/Dislike");
 const Notification = require("../../models/Notification");
 const Comment = require("../../models/Comment");
+const NotificationSwitch = require("../../models/NotificationSwitch");
 
 const storage = multer.diskStorage({
 	// destination: (req, file, cb) => {
@@ -46,13 +47,45 @@ module.exports = (passport) => {
 					});
 
 
+	// @route POST api/restricted-users/change-notification-state-for-post
+	// @desc Change notification state for post
+	// @access Authentication needed
+	router.post("/change-notification-state-for-post", 
+		  passport.authenticate('jwt', { session: false }),
+		  async (req, res) =>  {
+		    try {
+		    	if (!req.body.id || !req.body.target)
+		    		res.status(400).json({error: "user id or target id not sent!"});
+
+		    	let notificationState = null;
+				NotificationSwitchExisting = await NotificationSwitch.findOne({user_id: req.body.id,
+		    		target: req.body.target});
+		    	if (NotificationSwitchExisting) {
+		    		notificationState = await NotificationSwitch.updateOne({user_id: req.body.id,
+		    		target: req.body.target}, {notify: req.body.option});
+		    	} else {
+		    		notificationState = await new NotificationSwitch({user_id: req.body.id,
+		    		target: req.body.target, notify: req.body.option}).save();
+		    	}  
+
+		    	if (notificationState)
+		    		return res.status(201).json({message: "Notification state changed successfully", notify: req.body.option});  
+				else
+					return res.status(201).json("There was as error while changing Notification state");  
+
+		    } catch (err) {
+		        res.status(400).json({error: err.message});
+		    }
+		    
+		  }
+	);
+
 	// @route POST api/restricted-users/get-next-comments-with-page
 	// @desc Get next comments based on page number
 	// @access Authentication needed
 	router.get("/get-next-comments-with-page", 
 		  passport.authenticate('jwt', { session: false }),
 		  async (req, res) =>  {
-		    // Fetch the posts
 		    try {
 
 		        let page = parseInt(req.query.page);
@@ -73,8 +106,6 @@ module.exports = (passport) => {
 	    			ReversedCommentsToSend.push(item.toObject());
 	    		});
 
-	    		console.log()
-
 		        if (comments)
 					return res.status(201).json({comments: ReversedCommentsToSend});  
 		    } catch (err) {
@@ -90,7 +121,6 @@ module.exports = (passport) => {
 	router.get("/get-comments-with-page", 
 		  passport.authenticate('jwt', { session: false }),
 		  async (req, res) =>  {
-		    // Fetch the posts
 		    try {
 
 		    	// const posts = await Post.find()
@@ -189,15 +219,26 @@ module.exports = (passport) => {
 				        }).save().then(async comment => {
 				        	// Check if action taker is the same as post author to not show notification
 				        	if (req.body.post_author_id !== req.body.user_id) {
-				        		// Saving notification for commenting on a post
-				    			const newNotification = await new Notification({
-					              		user_id: req.body.post_author_id,
-					              		action_taker_user_id: req.body.user_id,
-					              		text: '<b>' + req.body.current_user_name + '</b> Commented on your post.',
-					              		type: 'post-commenting',
-					              		target: req.body.post_id,
-					              		seen: false 
-					              	}).save();
+				        		// Find if notifications are on for this post by the post author
+				    			postNotifyState = true;
+					    		const notificationSwitch = await NotificationSwitch.findOne({user_id: req.body.post_author_id,
+					    				target: req.body.post_id});
+					    		if (notificationSwitch) {
+					    			if (!notificationSwitch.notify)
+					    				postNotifyState = false;
+					    		}
+
+					    		if (postNotifyState) {
+					    			// Saving notification for commenting on a post
+					    			const newNotification = await new Notification({
+						              		user_id: req.body.post_author_id,
+						              		action_taker_user_id: req.body.user_id,
+						              		text: '<b>' + req.body.current_user_name + '</b> Commented on your post.',
+						              		type: 'post-commenting',
+						              		target: req.body.post_id,
+						              		seen: false 
+						              	}).save();
+					    		}
 				        	}
 
 				        	return res.status(201).json({message: "Successfully added comment"});
@@ -373,15 +414,26 @@ module.exports = (passport) => {
 			    		}
 			    		// Check if action taker is the same as post author to not show notification
 			    		if (req.body.post_author_id !== req.body.user_id) {
-			    			// Saving notification for disliking post
-			    			const newNotification = await new Notification({
-				              		user_id: req.body.post_author_id,
-				              		action_taker_user_id: req.body.user_id,
-				              		text: '<b>' + req.body.current_user_name + '</b> Disliked your post.',
-				              		type: 'post-disliking',
-				              		target: req.body.post_id,
-				              		seen: false 
-				              	}).save();
+			    			// Find if notifications are on for this post by the post author
+			    			postNotifyState = true;
+				    		const notificationSwitch = await NotificationSwitch.findOne({user_id: req.body.post_author_id,
+				    				target: req.body.post_id});
+				    		if (notificationSwitch) {
+				    			if (!notificationSwitch.notify)
+				    				postNotifyState = false;
+				    		}
+
+				    		if (postNotifyState) {
+				    			// Saving notification for disliking post
+				    			const newNotification = await new Notification({
+					              		user_id: req.body.post_author_id,
+					              		action_taker_user_id: req.body.user_id,
+					              		text: '<b>' + req.body.current_user_name + '</b> Disliked your post.',
+					              		type: 'post-disliking',
+					              		target: req.body.post_id,
+					              		seen: false 
+					              	}).save();
+				    		}
 			    		}
 	
 		              	return res.status(201).json({message: "post disliked successfully", disliked: true});
@@ -422,15 +474,26 @@ module.exports = (passport) => {
 			    		}
 			    		// Check if action taker is the same as post author to not show notification
 			    		if (req.body.post_author_id !== req.body.user_id) {
-			    			// Saving notification for liking post
-			    			const newNotification = await new Notification({
-				              		user_id: req.body.post_author_id,
-				              		action_taker_user_id: req.body.user_id,
-				              		text: '<b>' + req.body.current_user_name + '</b> Liked your post.',
-				              		type: 'post-liking',
-				              		target: req.body.post_id,
-				              		seen: false 
-				              	}).save();
+			    			// Find if notifications are on for this post by the post author
+			    			postNotifyState = true;
+				    		const notificationSwitch = await NotificationSwitch.findOne({user_id: req.body.post_author_id,
+				    				target: req.body.post_id});
+				    		if (notificationSwitch) {
+				    			if (!notificationSwitch.notify)
+				    				postNotifyState = false;
+				    		}
+
+				    		if (postNotifyState) {
+				    			// Saving notification for liking post
+				    			const newNotification = await new Notification({
+					              		user_id: req.body.post_author_id,
+					              		action_taker_user_id: req.body.user_id,
+					              		text: '<b>' + req.body.current_user_name + '</b> Liked your post.',
+					              		type: 'post-liking',
+					              		target: req.body.post_id,
+					              		seen: false 
+					              	}).save();
+				    		}
 			    		}
 
 		              	return res.status(201).json({message: "post liked successfully", liked: true});
@@ -562,7 +625,7 @@ module.exports = (passport) => {
 		    // Fetch the posts
 		    if (req.body.user_id){
 			    try {
-			    	// If user profile is opened through search 'user_id' is sent else 'id' is sent for post id
+
 			    	let user_id = req.body.user_id;
 			    	let logged_in_user_id = req.body.logged_in_user_id;
 
@@ -594,6 +657,16 @@ module.exports = (passport) => {
 			    			itemObj.liked = false;
 			    			itemObj.disliked = false;
 			    		}
+
+			    		// Find if notifications are on for this post
+			    		let postNotifyState = true;
+			    		const notificationSwitch = await NotificationSwitch.findOne({user_id: logged_in_user_id,
+			    				target: itemObj._id});
+			    		if (notificationSwitch) {
+			    			if (!notificationSwitch.notify)
+			    				postNotifyState = false;
+			    		}
+			    		itemObj.notify = postNotifyState;
 
 			        	// Find user by id for profile image and username
 			    		await User.findOne({ _id: itemObj.user_id }).then(user => {
@@ -695,6 +768,16 @@ module.exports = (passport) => {
 		    			itemObj.disliked = false;
 		    		}
 
+		    		// Find if notifications are on for this post
+		    		let postNotifyState = true;
+		    		const notificationSwitch = await NotificationSwitch.findOne({user_id: user_id,
+		    				target: itemObj._id});
+		    		if (notificationSwitch) {
+		    			if (!notificationSwitch.notify)
+		    				postNotifyState = false;
+		    		}
+		    		itemObj.notify = postNotifyState;
+		    		
 		        	// Find user by id for profile image and username
 		    		await User.findOne({ _id: itemObj.user_id }).then(user => {
 		    			itemObj.profile_picture = user.avatarImage;
