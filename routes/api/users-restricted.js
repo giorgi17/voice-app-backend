@@ -398,8 +398,10 @@ module.exports = (passport) => {
 	    			return res.status(400).json({errors: "post_id or user_id or post_author_id or current_user_name wasn't provided."});
 
 	    		checkForExistingDislike = await Dislike.findOne({user_id: req.body.user_id, post_id: req.body.post_id});
-	    		if (checkForExistingDislike)
-	    			return res.status(400).json({errors: "This post is already disliked by this user."});
+	    		if (checkForExistingDislike) {
+	    			removeDislike = await Dislike.deleteOne({user_id: req.body.user_id, post_id: req.body.post_id});
+	    			return res.status(201).json({disliked: false});
+	    		}
 
 	    		// Adding like
 	    		const newDislike = new Dislike({
@@ -458,8 +460,10 @@ module.exports = (passport) => {
 	    			return res.status(400).json({errors: "post_id or user_id or post_author_id or current_user_name wasn't provided."});
 
 	    		checkForExistingLike = await Like.findOne({user_id: req.body.user_id, post_id: req.body.post_id});
-	    		if (checkForExistingLike)
-	    			return res.status(400).json({errors: "This post is already liked by this user."});
+	    		if (checkForExistingLike) {
+	    			removeLike = await Like.deleteOne({user_id: req.body.user_id, post_id: req.body.post_id});
+	    			return res.status(201).json({liked: false});
+	    		}
 
 	    		// Adding like
 	    		const newLike = new Like({
