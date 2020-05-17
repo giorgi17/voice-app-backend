@@ -340,6 +340,32 @@ module.exports = (passport) => {
 		});
 
 
+	// @route POST api/restricted-users/get-notification-data-mobile"
+	// @desc get notification data on mobile responsive design
+	// @access Authentication needed
+	router.post("/get-notification-data-mobile",
+		passport.authenticate('jwt', { session: false }),
+		async (req, res) => {
+	    	try {
+	    		// Check if post_id is sent
+	    		if (!req.body.user_id)
+	    			return res.status(400).json({errors: "user_id wasn't provided."});
+
+		        let page = parseInt(req.body.page);
+		        const notifications = await Notification.find({ user_id: req.body.user_id })
+		            .sort( { created_at: -1 } )
+		            // .skip(page).limit(page+10);
+		            .skip(page).limit(30);
+
+	    		// Fetching unseen notifications
+	    		// const notifications = await Notification.find({user_id: req.body.user_id, seen: false});
+	  			return res.status(201).json({notifications: notifications});
+
+	    	} catch (e) {
+	    		res.status(400).json({errors: e.message});
+	    	}
+		});
+
 	// @route POST api/restricted-users/get-notification-data"
 	// @desc get notification data
 	// @access Authentication needed
