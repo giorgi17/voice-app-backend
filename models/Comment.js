@@ -18,6 +18,10 @@ const CommentsSchema = new Schema({
     type: String,
     required: true
   },
+  post_author_id: {
+    type: String,
+    required: true
+  },
   created_at: {
     type: Date,
     default: Date.now

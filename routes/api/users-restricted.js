@@ -216,7 +216,8 @@ module.exports = (passport) => {
 				          user_id: req.body.user_id,
 				          post_id: req.body.post_id,
 				          user_name: req.body.current_user_name,
-				          content: req.body.content
+				          content: req.body.content,
+				          post_author_id: req.body.post_author_id
 				        }).save().then(async comment => {
 				        	// Check if action taker is the same as post author to not show notification
 				        	if (req.body.post_author_id !== req.body.user_id) {
@@ -412,6 +413,37 @@ module.exports = (passport) => {
 	    	}
 		});
 
+	// @route POST api/restricted-users/get-user-statistics"
+	// @desc get user statistics
+	// @access Authentication needed
+	router.post("/get-user-statistics",
+		passport.authenticate('jwt', { session: false }),
+		async (req, res) => {
+	    	try {
+	    		// Check if post_id is sent
+	    		if (!req.body.user_id)
+	    			return res.status(400).json({errors: "user_id wasn't provided."});
+
+	    		const posts = await Post.find({ user_id: req.body.user_id }).countDocuments();
+	    		const followers = await Follower.find({ followed_id: req.body.user_id }).countDocuments();
+	    		const following = await Follower.find({ follower_id: req.body.user_id }).countDocuments();
+	    		const likes = await Like.find({ post_author_id: req.body.user_id }).countDocuments();
+	    		const dislikes = await Dislike.find({ post_author_id: req.body.user_id }).countDocuments();
+	    		const comments = await Comment.find({ post_author_id: req.body.user_id }).countDocuments();
+	    		const views = await View.find({ post_author_id: req.body.user_id }).countDocuments();
+		        // const likes = await Like.find({ post_id: req.body.post_id }).countDocuments();
+		        // const dislikes = await Dislike.find({ post_id: req.body.post_id }).countDocuments();
+		        // const comments = await Comment.find({ post_id: req.body.post_id }).countDocuments();
+		        // const views = await View.find({ post_id: req.body.post_id }).countDocuments();
+
+
+	    		// return Post information
+	  			return res.status(201).json({posts, followers, following, likes, dislikes, comments, views});
+	    	} catch (e) {
+	    		res.status(400).json({errors: e.message});
+	    	}
+		});
+
 	// @route POST api/restricted-users/get-post-likes-dislikes-comments-views"
 	// @desc get post likes dislikes comments views
 	// @access Authentication needed
@@ -456,7 +488,8 @@ module.exports = (passport) => {
 	    		// Adding View
 	    		const newView = new View({
 			          user_id: req.body.user_id,
-			          post_id: req.body.post_id
+			          post_id: req.body.post_id,
+			          post_author_id: req.body.post_author_id
 			        }).save()
 		              .then(async like => {
 		              	return res.status(201).json({message: "post viewed successfully", newView: true});
@@ -489,7 +522,8 @@ module.exports = (passport) => {
 	    		// Adding like
 	    		const newDislike = new Dislike({
 			          user_id: req.body.user_id,
-			          post_id: req.body.post_id
+			          post_id: req.body.post_id,
+			          post_author_id: req.body.post_author_id
 			        }).save()
 		              .then(async like => {
 		              	// Delete like
@@ -551,7 +585,8 @@ module.exports = (passport) => {
 	    		// Adding like
 	    		const newLike = new Like({
 			          user_id: req.body.user_id,
-			          post_id: req.body.post_id
+			          post_id: req.body.post_id,
+			          post_author_id: req.body.post_author_id
 			        }).save()
 		              .then(async like => {
 		              	// Delete dislike

@@ -10,6 +10,10 @@ const ViewsSchema = new Schema({
     type: String,
     required: true
   },
+  post_author_id: {
+    type: String,
+    required: true
+  },
   date: {
     type: Date,
     default: Date.now
