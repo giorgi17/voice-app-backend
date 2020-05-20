@@ -17,6 +17,7 @@ const Post = require("../../models/Post");
 const Follower = require("../../models/Follower");
 const Like = require("../../models/Like");
 const Dislike = require("../../models/Dislike");
+const View = require("../../models/View");
 const Notification = require("../../models/Notification");
 const Comment = require("../../models/Comment");
 const NotificationSwitch = require("../../models/NotificationSwitch");
@@ -373,7 +374,7 @@ module.exports = (passport) => {
 		passport.authenticate('jwt', { session: false }),
 		async (req, res) => {
 	    	try {
-	    		// Check if post_id is sent
+	    		// Check if user_id is sent
 	    		if (!req.body.user_id)
 	    			return res.status(400).json({errors: "user_id wasn't provided."});
 
@@ -405,6 +406,62 @@ module.exports = (passport) => {
 	    		// Counting unseen notifications
 	    		const notificationsNumber = await Notification.find({user_id: req.body.user_id, seen: false}).countDocuments();
 	  			return res.status(201).json({notification: notificationsNumber});
+
+	    	} catch (e) {
+	    		res.status(400).json({errors: e.message});
+	    	}
+		});
+
+	// @route POST api/restricted-users/get-post-likes-dislikes-comments-views"
+	// @desc get post likes dislikes comments views
+	// @access Authentication needed
+	router.post("/get-post-likes-dislikes-comments-views",
+		passport.authenticate('jwt', { session: false }),
+		async (req, res) => {
+	    	try {
+	    		// Check if post_id is sent
+	    		if (!req.body.post_id)
+	    			return res.status(400).json({errors: "post_id wasn't provided."});
+
+		        const likes = await Like.find({ post_id: req.body.post_id }).countDocuments();
+		        const dislikes = await Dislike.find({ post_id: req.body.post_id }).countDocuments();
+		        const comments = await Comment.find({ post_id: req.body.post_id }).countDocuments();
+		        const views = await View.find({ post_id: req.body.post_id }).countDocuments();
+
+
+	    		// return Post information
+	  			return res.status(201).json({likes, dislikes, comments, views});
+	    	} catch (e) {
+	    		res.status(400).json({errors: e.message});
+	    	}
+		});
+
+	// @route POST api/restricted-users/post-view"
+	// @desc view post
+	// @access Authentication needed
+	router.post("/post-view",
+		passport.authenticate('jwt', { session: false }),
+		async (req, res) => {
+	    	try {
+	    		
+	    		// Check if post_id is sent
+	    		if (!req.body.post_id || !req.body.user_id || !req.body.post_author_id || !req.body.current_user_name)
+	    			return res.status(400).json({errors: "post_id or user_id or post_author_id or current_user_name wasn't provided."});
+
+	    		checkForExistingView = await View.findOne({user_id: req.body.user_id, post_id: req.body.post_id});
+	    		if (checkForExistingView) 
+	    			return res.status(201).json({message: "Already viewed this post", newView: false});
+	    		
+
+	    		// Adding View
+	    		const newView = new View({
+			          user_id: req.body.user_id,
+			          post_id: req.body.post_id
+			        }).save()
+		              .then(async like => {
+		              	return res.status(201).json({message: "post viewed successfully", newView: true});
+		              })
+		              .catch(err => res.status(400).json({errors: "Error while saving view to database - " + err}));
 
 	    	} catch (e) {
 	    		res.status(400).json({errors: e.message});
