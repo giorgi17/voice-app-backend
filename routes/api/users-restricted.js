@@ -431,11 +431,6 @@ module.exports = (passport) => {
 	    		const dislikes = await Dislike.find({ post_author_id: req.body.user_id }).countDocuments();
 	    		const comments = await Comment.find({ post_author_id: req.body.user_id }).countDocuments();
 	    		const views = await View.find({ post_author_id: req.body.user_id }).countDocuments();
-		        // const likes = await Like.find({ post_id: req.body.post_id }).countDocuments();
-		        // const dislikes = await Dislike.find({ post_id: req.body.post_id }).countDocuments();
-		        // const comments = await Comment.find({ post_id: req.body.post_id }).countDocuments();
-		        // const views = await View.find({ post_id: req.body.post_id }).countDocuments();
-
 
 	    		// return Post information
 	  			return res.status(201).json({posts, followers, following, likes, dislikes, comments, views});
