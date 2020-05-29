@@ -413,6 +413,60 @@ module.exports = (passport) => {
 	    	}
 		});
 
+	// @route POST api/restricted-users/get-user-following"
+	// @desc get user following
+	// @access Authentication needed
+	router.post("/get-user-following",
+		passport.authenticate('jwt', { session: false }),
+		async (req, res) => {
+	    	try {
+	    		// Check if post_id is sent
+	    		if (!req.body.user_id)
+	    			return res.status(400).json({errors: "user_id wasn't provided."});
+
+	    		let page = parseInt(req.body.page);
+
+	    		const followings = await Follower.find({ follower_id: req.body.user_id }).sort( { date: -1 } );
+	    		let followingsUsersIds = [];
+	    		followings.forEach(item => {
+	    			followingsUsersIds.push(item.followed_id);
+	    		});
+	    		followingUsersData = await User.find({ _id: { $in: followingsUsersIds } }).skip(page).limit(10);
+
+	    		// return Post information
+	  			return res.status(201).json(followingUsersData);
+	    	} catch (e) {
+	    		res.status(400).json({errors: e.message});
+	    	}
+		});
+
+	// @route POST api/restricted-users/get-user-followers"
+	// @desc get user followers
+	// @access Authentication needed
+	router.post("/get-user-followers",
+		passport.authenticate('jwt', { session: false }),
+		async (req, res) => {
+	    	try {
+	    		// Check if post_id is sent
+	    		if (!req.body.user_id)
+	    			return res.status(400).json({errors: "user_id wasn't provided."});
+
+	    		let page = parseInt(req.body.page);
+
+	    		const followers = await Follower.find({ followed_id: req.body.user_id }).sort( { date: -1 } );
+	    		let followerUsersIds = [];
+	    		followers.forEach(item => {
+	    			followerUsersIds.push(item.follower_id);
+	    		});
+	    		followerUsersData = await User.find({ _id: { $in: followerUsersIds } }).skip(page).limit(10);
+
+	    		// return Post information
+	  			return res.status(201).json(followerUsersData);
+	    	} catch (e) {
+	    		res.status(400).json({errors: e.message});
+	    	}
+		});
+
 	// @route POST api/restricted-users/get-user-statistics"
 	// @desc get user statistics
 	// @access Authentication needed
