@@ -436,6 +436,7 @@ module.exports = (passport) => {
 
 	    		// return Post information
 	  			return res.status(201).json(followerUsersData);
+	  			return res.status(201).json(ffollowerUsersData);
 	    	} catch (e) {
 	    		res.status(400).json({errors: e.message});
 	    	}
@@ -880,6 +881,7 @@ module.exports = (passport) => {
 		        	followedUsers.map(item => {
 		        		followedUsersIds.push(item.followed_id);
 		        	});
+		        	followedUsersIds.push(user_id);
 		   
 		        	filter = {user_id: { $in: followedUsersIds}};
 		        } else if (req.query.filter === 'myPosts') {
@@ -937,6 +939,161 @@ module.exports = (passport) => {
 		        res.status(400).json({error: err.message});
 		    }
 		    
+		  }
+	);
+
+	// @route POST api/restricted-users/fetch-single-post
+	// @desc Fetch single post
+	// @access Authentication needed
+	router.post("/fetch-single-post", 
+		  passport.authenticate('jwt', { session: false }),
+
+		  async (req, res) =>  {
+
+		  	if (!req.body.post_author_id || !req.body.user_id || !req.body.post_id)
+		  		return res.status(400).json({errors: "One of the parameters are not set biaaach!"});
+
+		  	// Getting user info to check if he's admin or not
+		  	const loggedUser = await User.findOne({_id: req.body.user_id});
+		  	
+		  	// Check if post doesn't belong to user
+		  	if (req.body.post_author_id !== req.body.user_id) {
+		  		if (!loggedUser.isAdmin)
+		  			return res.status(400).json({errors: "This is not your post biaaach!"});
+		  	}
+
+		    // fetch post
+		    const fetchedPost = await Post.findOne({ _id: req.body.post_id });
+
+		    if (fetchedPost) {
+		    	return res.status(201).json({message: "Post fetched successfully", result: fetchedPost});
+		    } else {
+		    	return res.status(400).json({errors: "Error while deleting post"});
+		    }
+	  		
+		  }
+	);
+
+	// @route POST api/restricted-users/delete-post
+	// @desc Delete post
+	// @access Authentication needed
+	router.post("/delete-post", 
+		  passport.authenticate('jwt', { session: false }),
+
+		  async (req, res) =>  {
+
+		  	if (!req.body.post_author_id || !req.body.user_id || !req.body.post_id)
+		  		return res.status(400).json({errors: "One of the parameters are not set biaaach!"});
+
+		  	// Getting user info to check if he's admin or not
+		  	const loggedUser = await User.findOne({_id: req.body.user_id});
+		  	
+		  	// Check if post doesn't belong to user
+		  	if (req.body.post_author_id !== req.body.user_id) {
+		  		if (!loggedUser.isAdmin)
+		  			return res.status(400).json({errors: "This is not your post biaaach!"});
+		  	}
+
+		    // delete post
+		    const postDeletion = await Post.deleteOne({ _id: req.body.post_id });
+
+		    if (postDeletion) {
+		    	return res.status(201).json({message: "Post deleted successfully"});
+		    } else {
+		    	return res.status(400).json({errors: "Error while deleting post"});
+		    }
+	  		
+		  }
+	);
+
+	// @route POST api/restricted-users/update-post
+	// @desc Update post
+	// @access Authentication needed
+	router.post("/update-post", 
+		  passport.authenticate('jwt', { session: false }),
+		  upload.fields([{
+          	name: 'postPicture', maxCount: 1
+          }]),
+		  async (req, res) =>  {
+		  	let pictureFileName = null, uploadedImageLink = null, updateQuery = null;
+
+		  	if (req.body.description) 
+		  		updateQuery = { description: req.body.description, updated_at: Date.now() };
+
+		  	// Getting user info to check if he's admin or not
+		  	const loggedUser = await User.findOne({_id: req.body.user_id});
+		  	
+		  	// Check if post doesn't belong to user
+		  	if (req.body.post_author_id !== req.body.user_id) {
+		  		if (!loggedUser.isAdmin)
+		  			return res.status(400).json({errors: "This is not your post biaaach!"});
+		  	}
+
+		  	// Check if image was sent and if so, change it's name
+		  	if (req.files.postPicture) {
+			  	const imageFile = req.files.postPicture[0];
+		  		pictureFileName = new Date().toISOString() + imageFile.originalname;
+		  		imageFile.filename = pictureFileName;
+		  	} 
+
+		  	const s3 = new aws.S3();	
+		  	// console.log(req.body.currentPicturePath);
+		    // Uploading image to AWS S3 BUCKET
+		    if (!req.body.currentPicturePath) {
+		    	return res.status(400).json({errors: "current image path wasn't sent"});
+		    } else {
+
+		    	if (req.files.postPicture) {
+		    		if (req.body.currentPicturePath) {
+		    			// Delete the old picture from aws s3
+				         var params = {  Bucket: 'voice-social-network', Key: req.body.currentPicturePath };
+				         await s3.deleteObject(params).promise();
+		    		}
+		    		// console.log("WWW");
+		    		// if (req.body.currentPicturePath !== 'post-pictures/stripes.png') {
+		    		// 	// Delete the old picture from aws s3
+				    //      var params = {  Bucket: 'voice-social-network', Key: req.body.currentPicturePath };
+				    //      await s3.deleteObject(params).promise();
+				    //      console.log("Doesn't equal");
+		    		// } else {
+		    		// 	updateQuery = { picture: 'https://voice-social-network.s3.us-east-2.amazonaws.com/post-pictures/stripes.png',
+		    		// 		 description: req.body.description, updated_at: Date.now() };
+		    		// 		 console.log("Equals");
+		    		// }
+		    		// console.log("BBB");
+			    	const pictureUploadParams = {
+			         Bucket: 'voice-social-network', // bucket name
+			         Key: 'post-pictures/' + pictureFileName, // file will be saved with new unique name
+			         Body: fs.createReadStream(req.files.postPicture[0].path)
+			         };
+				    const pictureUploadResult = s3.upload(pictureUploadParams).promise();
+				    await pictureUploadResult.then(data => {
+				    	uploadedImageLink = data.Location;
+			    		console.log(`The picture file was successfully uploaded - ${data.Location}`);
+			    		updateQuery = { picture: uploadedImageLink, description: req.body.description,
+			    			 updated_at: Date.now() };
+			    	}).catch(err => {
+			    		return res.status(400).json({errors: 'Error while uploading picture file - ' + err});
+			    	});
+		    	} else if (req.body.currentPicturePath === 'post-pictures/stripes.png') {
+		    		uploadedImageLink = 'https://voice-social-network.s3.us-east-2.amazonaws.com/post-pictures/stripes.png';
+		    		updateQuery = { picture: 'https://voice-social-network.s3.us-east-2.amazonaws.com/post-pictures/stripes.png',
+		    				 description: req.body.description, updated_at: Date.now() };
+		    				 console.log("Equals");
+		    	}
+		    }
+		    console.log(updateQuery);
+		    // Update post
+		    const postUpdate = await Post.updateOne({ _id: req.body.post_id }, { $set: updateQuery });
+
+		    if (postUpdate) {
+		    	return res.status(201).json({message: "Post updated successfully", picture: uploadedImageLink,
+		    			description: req.body.description});
+		    }
+		    else {
+		    	return res.status(400).json({errors: "Error while updating post"});
+		    }
+	  		
 		  }
 	);
 
@@ -1078,6 +1235,7 @@ module.exports = (passport) => {
 
 				    // Delete the old picture from aws s3
 			         var params = {  Bucket: 'voice-social-network', Key: req.body.currentPicturePath };
+			         console.log(req.body.currentPicturePath);
 			         await s3.deleteObject(params).promise();
 						    
 						
@@ -1210,7 +1368,7 @@ module.exports = (passport) => {
 		    }
 
 		    if (user) {
-		      res.status(201).json({name: user.name, email: user.email, avatarImage: user.avatarImage});
+		      res.status(201).json(user);
 		    }
 		});
 
