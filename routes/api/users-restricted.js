@@ -1079,10 +1079,9 @@ module.exports = (passport) => {
 		    		uploadedImageLink = 'https://voice-social-network.s3.us-east-2.amazonaws.com/post-pictures/stripes.png';
 		    		updateQuery = { picture: 'https://voice-social-network.s3.us-east-2.amazonaws.com/post-pictures/stripes.png',
 		    				 description: req.body.description, updated_at: Date.now() };
-		    				 console.log("Equals");
 		    	}
 		    }
-		    console.log(updateQuery);
+
 		    // Update post
 		    const postUpdate = await Post.updateOne({ _id: req.body.post_id }, { $set: updateQuery });
 
@@ -1166,7 +1165,7 @@ module.exports = (passport) => {
 	          sound: uploadedSoundLink,
 	          description: req.body.description
 	        }).save()
-              .then(post => res.status(201).json("Post saved successfully"))
+              .then(post => res.status(201).json({message: "Post saved successfully", post}))
               .catch(err => res.status(400).json({errors: "Error while saving post to database - " + err}));
 		  }
 	);
