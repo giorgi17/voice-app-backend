@@ -254,24 +254,6 @@ module.exports = (passport) => {
 		    }
 		});
 
-	// @route POST api/restricted-users/get-logged-in-user-profile-picture-for-new-comment
-	// @desc Fetch user profile picture to display in notifications panel
-	// @access Authentication needed
-	router.post("/get-logged-in-user-profile-picture-for-new-comment",
-		passport.authenticate('jwt', { session: false }),
-		async (req, res) => {
-		    if (req.body.user_id){
-		    	try {
-		    		let user = await User.findOne({ _id: req.body.user_id });
-		    		if (user)
-		    			return res.status(201).json({profilePicture: user.avatarImage});
-		    	} catch (e) {
-		    		res.status(400).json({errors: e.message});
-		    	}
-		    } else {
-		    	res.status(400).json({errors: "user_id id wasn't provided!"});
-		    }
-		});
 
 	// @route POST api/restricted-users/get-post-picture-for-notifications
 	// @desc Fetch user profile picture to display in notifications panel
@@ -1246,11 +1228,13 @@ module.exports = (passport) => {
 
 			    	if (!data)
 			    		res.status(400).json({errors: "Error uploading picture to aws s3"});
-			        console.log(`File uploaded successfully at ${data.Location}`); 
+
+			    	res.status(201).json({message: "Successfully updated profile picture",
+		  			newPicture: data.Location});
+
+			        console.log(`File uploaded successfully at ${data.Location}`);
 		     	});
 			    
-
-		  		res.status(201).json("Successfully updated profile picture");
 		  	} catch (e) {
 		  		res.status(400).json({errors: {full_error: e, error_message: e.message}});
 		  	}
