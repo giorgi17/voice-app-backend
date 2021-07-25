@@ -1070,8 +1070,8 @@ module.exports = (passport) => {
 			    		return res.status(400).json({errors: 'Error while uploading picture file - ' + err});
 			    	});
 		    	} else if (req.body.currentPicturePath === 'post-pictures/stripes.png') {
-		    		uploadedImageLink = 'https://voice-social-network.s3.us-east-2.amazonaws.com/post-pictures/stripes.png';
-		    		updateQuery = { picture: 'https://voice-social-network.s3.us-east-2.amazonaws.com/post-pictures/stripes.png',
+		    		uploadedImageLink = 'https://guthme.s3.eu-central-1.amazonaws.com/post-pictures/stripes.png';
+		    		updateQuery = { picture: 'https://guthme.s3.eu-central-1.amazonaws.com/post-pictures/stripes.png',
 		    				 description: req.body.description, updated_at: Date.now() };
 		    	}
 		    }
@@ -1138,7 +1138,7 @@ module.exports = (passport) => {
 
 		    // Uploading image to AWS S3 BUCKET
 		    if (!req.files.postPicture) {
-		    	uploadedImageLink = 'https://voice-social-network.s3.us-east-2.amazonaws.com/post-pictures/stripes.png';
+		    	uploadedImageLink = 'https://guthme.s3.eu-central-1.amazonaws.com/post-pictures/stripes.png';
 		    } else {
 		    	const pictureUploadParams = {
 		        //  Bucket: 'voice-social-network', // bucket name
