@@ -767,10 +767,16 @@ module.exports = (passport) => {
 			        const postsTransformed = await Promise.all(posts.map( async item => {
 			        	// Calculate duration for each audio and return as string
 			        	const itemObj = item.toObject();
-			        	await getAudioDurationInSeconds(itemObj.sound).then((duration) => {
-						  const secondsRounded = Math.round(duration);
-						  itemObj.audio_duration =  TimeFormat.fromS(secondsRounded, 'hh:mm:ss'); 
-						});
+
+						try {
+							await getAudioDurationInSeconds(itemObj.sound).then((duration) => {
+								const secondsRounded = Math.round(duration);
+								itemObj.audio_duration =  TimeFormat.fromS(secondsRounded, 'hh:mm:ss'); 
+							  });
+						} catch (e) {
+							
+						}
+			       
 
 			        	// See if the post is liked or disliked by the user 
 		              	let likeData = await Like.findOne({user_id: logged_in_user_id, post_id: itemObj._id});
@@ -878,10 +884,14 @@ module.exports = (passport) => {
 		        const postsTransformed = await Promise.all(posts.map( async item => {
 		        	// Calculate duration for each audio and return as string
 		        	const itemObj = item.toObject();
-		        	await getAudioDurationInSeconds(itemObj.sound).then((duration) => {
-					  const secondsRounded = Math.round(duration);
-					  itemObj.audio_duration =  TimeFormat.fromS(secondsRounded, 'hh:mm:ss'); 
-					});
+					try {
+						await getAudioDurationInSeconds(itemObj.sound).then((duration) => {
+							const secondsRounded = Math.round(duration);
+							itemObj.audio_duration =  TimeFormat.fromS(secondsRounded, 'hh:mm:ss'); 
+						  });
+					} catch (err) {
+					}
+		        
 
 		        	// See if the post is liked or disliked by the user 
 	              	let likeData = await Like.findOne({user_id: user_id, post_id: itemObj._id});
@@ -1028,7 +1038,8 @@ module.exports = (passport) => {
 		    	if (req.files.postPicture) {
 		    		if (req.body.currentPicturePath) {
 		    			// Delete the old picture from aws s3
-				         var params = {  Bucket: 'voice-social-network', Key: req.body.currentPicturePath };
+				        //  var params = {  Bucket: 'voice-social-network', Key: req.body.currentPicturePath };
+						var params = {  Bucket: 'guthme', Key: req.body.currentPicturePath };
 				         await s3.deleteObject(params).promise();
 		    		}
 		    		// console.log("WWW");
@@ -1044,7 +1055,8 @@ module.exports = (passport) => {
 		    		// }
 		    		// console.log("BBB");
 			    	const pictureUploadParams = {
-			         Bucket: 'voice-social-network', // bucket name
+			        //  Bucket: 'voice-social-network', // bucket name
+					Bucket: 'guthme', // bucket name
 			         Key: 'post-pictures/' + pictureFileName, // file will be saved with new unique name
 			         Body: fs.createReadStream(req.files.postPicture[0].path)
 			         };
@@ -1110,7 +1122,9 @@ module.exports = (passport) => {
 
 		  	// Uploading audio to AWS S3 BUCKET
 	  		const audioUploadParams = {
-		         Bucket: 'voice-social-network', // bucket name
+		        //  Bucket: 'voice-social-network', // bucket name
+				 Bucket: 'guthme', // bucket name
+				// guthme
 		         Key: 'posts-audio/' + soundFileName, // file will be saved with new unique name
 		         Body: fs.createReadStream(req.files.postSound[0].path)
 		         };
@@ -1127,7 +1141,8 @@ module.exports = (passport) => {
 		    	uploadedImageLink = 'https://voice-social-network.s3.us-east-2.amazonaws.com/post-pictures/stripes.png';
 		    } else {
 		    	const pictureUploadParams = {
-		         Bucket: 'voice-social-network', // bucket name
+		        //  Bucket: 'voice-social-network', // bucket name
+				Bucket: 'guthme', // bucket name
 		         Key: 'post-pictures/' + pictureFileName, // file will be saved with new unique name
 		         Body: fs.createReadStream(req.files.postPicture[0].path)
 		         };
@@ -1206,7 +1221,8 @@ module.exports = (passport) => {
 
 		  		// Uploading image to AWS S3 BUCKET
 		  		const params = {
-			         Bucket: 'voice-social-network', // bucket name
+			        //  Bucket: 'voice-social-network', // bucket name
+					Bucket: 'guthme', // bucket name
 			         Key: 'avatar-pictures/' + fileName, // file will be saved with new unique name
 			         Body: fs.createReadStream(req.file.path)
 			     };
@@ -1215,7 +1231,8 @@ module.exports = (passport) => {
 			         if (s3Err) throw s3Err;			    
 
 				    // Delete the old picture from aws s3
-			         var params = {  Bucket: 'voice-social-network', Key: req.body.currentPicturePath };
+			        //  var params = {  Bucket: 'voice-social-network', Key: req.body.currentPicturePath };
+					var params = {  Bucket: 'guthme', Key: req.body.currentPicturePath };
 			         console.log(req.body.currentPicturePath);
 			         await s3.deleteObject(params).promise();
 						    
