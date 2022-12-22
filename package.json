@@ -17,7 +17,7 @@
     "get-audio-duration": "^1.0.0",
     "hh-mm-ss": "^1.2.0",
     "is-empty": "^1.2.0",
-    "jsonwebtoken": "^8.5.1",
+    "jsonwebtoken": "^9.0.0",
     "mongoose": "^5.13.3",
     "multer": "^1.4.2",
     "nodemon": "^2.0.3",
